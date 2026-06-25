@@ -115,3 +115,8 @@ This case study highlights the importance of methodology over automation.
 Rather than relying solely on predefined exploit modules, leveraging discovered credentials through tools like Impacket can provide:
 - Real-world applicability
 - Improved understanding of attack surface
+
+##Author 
+
+Abin Watson 
+Date : February 2026 
